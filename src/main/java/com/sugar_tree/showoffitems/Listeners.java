@@ -10,37 +10,59 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 
+import java.util.Map;
 import java.util.Objects;
 
 public class Listeners implements Listener {
 
-    @SuppressWarnings("ConstantConditions")
+    private static final Component SHOW_OFF_TITLE = Component.text(ChatColor.GREEN + "자랑 할 아이템을 올려주세요!");
+
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getView().title().equals(Component.text(ChatColor.GREEN + "자랑 할 아이템을 올려주세요!"))) {
-            if (!(event.getInventory().getItem(4) == null)) {
-                if (!(event.getInventory().getItem(4).getType().isAir())) {
-                    Bukkit.broadcast(((Player) event.getPlayer()).displayName().append(Component.text("님이 ").append(event.getInventory().getItem(4).displayName()).append(Component.text("x" + event.getInventory().getItem(4).getAmount() + "을(를) 자랑합니다!"))));
-                    event.getPlayer().getInventory().addItem(Objects.requireNonNull(event.getInventory().getItem(4)));
+        if (!event.getView().title().equals(SHOW_OFF_TITLE)) return;
+
+        Inventory inv = event.getInventory();
+        ItemStack item = inv.getItem(4);
+
+        if (item != null && !item.getType().isAir()) {
+            Player player = (Player) event.getPlayer();
+
+            // 자랑 메시지 브로드캐스트
+            Component message = player.displayName()
+                .append(Component.text("님이 "))
+                .append(item.displayName())
+                .append(Component.text(" x" + item.getAmount() + " 을(를) 자랑합니다!"));
+            Bukkit.broadcast(message);
+
+            // 아이템 지급 시도
+            Map<Integer, ItemStack> leftovers = player.getInventory().addItem(item.clone());
+            if (!leftovers.isEmpty()) {
+                for (ItemStack leftover : leftovers.values()) {
+                    player.getWorld().dropItemNaturally(player.getLocation(), leftover);
                 }
+                player.sendMessage(ChatColor.YELLOW + "인벤토리가 가득 차서 아이템 일부가 바닥에 떨어졌습니다!");
             }
+
+            // 슬롯 정리
+            inv.setItem(4, null);
         }
     }
 
     @EventHandler
-    public void showOffEvent(InventoryClickEvent event) {
-        if (event.getWhoClicked().getOpenInventory().title().equals(Component.text(ChatColor.GREEN + "자랑 할 아이템을 올려주세요!"))) {
-            if (event.getClick().equals(ClickType.NUMBER_KEY)) {
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (!event.getWhoClicked().getOpenInventory().title().equals(SHOW_OFF_TITLE)) return;
+
+        if (event.getClick() == ClickType.NUMBER_KEY) {
+            event.setCancelled(true);
+            return;
+        }
+
+        if (event.getClickedInventory() != null && event.getClickedInventory().getType() == InventoryType.CHEST) {
+            if (event.getSlot() != 4 || event.getClick() == ClickType.DROP || event.getClick() == ClickType.CONTROL_DROP) {
                 event.setCancelled(true);
-                return;
-            }
-            if (!(event.getClickedInventory() == null)) {
-                if ((event.getClickedInventory()).getType().equals(InventoryType.CHEST)) {
-                    if (event.getSlot() != 4 || event.getClick().equals(ClickType.DROP) || event.getClick().equals(ClickType.CONTROL_DROP)) {
-                        event.setCancelled(true);
-                    }
-                }
             }
         }
     }
